@@ -2,6 +2,7 @@
 using AuthenticateWithJWT.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -13,29 +14,37 @@ namespace AuthenticateWithJWT.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        public static User user = new User();
+       
         private readonly IConfiguration configuration;
 
-        public UsersController(IConfiguration configuration)
+        public DataContext _context { get; }
+
+        public UsersController(IConfiguration configuration, DataContext _context)
         {
             this.configuration = configuration;
+            this._context = _context;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register(UserDTO request)
         {
             CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
+
+            var user = new User();
+            user.Id = new Guid();
             user.Username = request.Username;
             user.PasswordHash = passwordHash;
             user.PasswordSalt = passwordSalt;
-
+            await _context.Users.AddAsync(user);
+            await _context.SaveChangesAsync();
             return Ok(user);
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login(UserDTO request)
         {
-            if (user.Username != request.Username)
+            var user = await _context.Users.FirstOrDefaultAsync(x=>x.Username == request.Username);
+            if (user == null)
             {
                 return NotFound("User not found!");
             }
